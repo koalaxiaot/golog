@@ -90,13 +90,6 @@ func New() *Logger {
 
 }
 
-// SetOutput sets the output destination for the logger.
-func (l *Logger) SetOutput(w io.Writer) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.out = w
-}
-
 var std = New()
 
 // Cheap integer to fixed-width decimal ASCII.  Give a negative width to avoid zero-padding.
@@ -169,7 +162,7 @@ func (l *Logger) formatHeader(buf *[]byte, t time.Time, file string, line int) {
 // already a newline.  Calldepth is used to recover the PC and is
 // provided for generality, although at the moment on all pre-defined
 // paths it will be 2.
-func (l *Logger) Output(calldepth int, s string) error {
+func (l *Logger) output(calldepth int, s string) error {
 	now := time.Now() // get this early.
 	var file string
 	var line int
@@ -202,59 +195,6 @@ func (l *Logger) Output(calldepth int, s string) error {
 
 	_, err := l.out.Write(l.buf)
 	return err
-}
-
-// Printf calls l.Output to print to the logger.
-// Arguments are handled in the manner of fmt.Printf.
-func (l *Logger) Printf(format string, v ...interface{}) {
-	l.Output(2, fmt.Sprintf(format, v...))
-}
-
-// Print calls l.Output to print to the logger.
-// Arguments are handled in the manner of fmt.Print.
-func (l *Logger) Print(v ...interface{}) { l.Output(2, fmt.Sprint(v...)) }
-
-// Println calls l.Output to print to the logger.
-// Arguments are handled in the manner of fmt.Println.
-func (l *Logger) Println(v ...interface{}) { l.Output(2, fmt.Sprintln(v...)) }
-
-// Fatal is equivalent to l.Print() followed by a call to os.Exit(1).
-func (l *Logger) Fatal(v ...interface{}) {
-	l.Output(2, fmt.Sprint(v...))
-	os.Exit(1)
-}
-
-// Fatalf is equivalent to l.Printf() followed by a call to os.Exit(1).
-func (l *Logger) Fatalf(format string, v ...interface{}) {
-	l.Output(2, fmt.Sprintf(format, v...))
-	os.Exit(1)
-}
-
-// Fatalln is equivalent to l.Println() followed by a call to os.Exit(1).
-func (l *Logger) Fatalln(v ...interface{}) {
-	l.Output(2, fmt.Sprintln(v...))
-	os.Exit(1)
-}
-
-// Panic is equivalent to l.Print() followed by a call to panic().
-func (l *Logger) Panic(v ...interface{}) {
-	s := fmt.Sprint(v...)
-	l.Output(2, s)
-	panic(s)
-}
-
-// Panicf is equivalent to l.Printf() followed by a call to panic().
-func (l *Logger) Panicf(format string, v ...interface{}) {
-	s := fmt.Sprintf(format, v...)
-	l.Output(2, s)
-	panic(s)
-}
-
-// Panicln is equivalent to l.Println() followed by a call to panic().
-func (l *Logger) Panicln(v ...interface{}) {
-	s := fmt.Sprintln(v...)
-	l.Output(2, s)
-	panic(s)
 }
 
 // Flags returns the output flags for the logger.
@@ -310,77 +250,6 @@ func Prefix() string {
 // SetPrefix sets the output prefix for the standard logger.
 func SetPrefix(prefix string) {
 	std.SetPrefix(prefix)
-}
-
-// These functions write to the standard logger.
-
-// Print calls Output to print to the standard logger.
-// Arguments are handled in the manner of fmt.Print.
-func Print(v ...interface{}) {
-	err := std.Output(2, fmt.Sprint(v...))
-	fmt.Println(err)
-}
-
-// Printf calls Output to print to the standard logger.
-// Arguments are handled in the manner of fmt.Printf.
-func Printf(format string, v ...interface{}) {
-	std.Output(2, fmt.Sprintf(format, v...))
-}
-
-// Println calls Output to print to the standard logger.
-// Arguments are handled in the manner of fmt.Println.
-func Println(v ...interface{}) {
-	std.Output(2, fmt.Sprintln(v...))
-}
-
-// Fatal is equivalent to Print() followed by a call to os.Exit(1).
-func Fatal(v ...interface{}) {
-	std.Output(2, fmt.Sprint(v...))
-	os.Exit(1)
-}
-
-// Fatalf is equivalent to Printf() followed by a call to os.Exit(1).
-func Fatalf(format string, v ...interface{}) {
-	std.Output(2, fmt.Sprintf(format, v...))
-	os.Exit(1)
-}
-
-// Fatalln is equivalent to Println() followed by a call to os.Exit(1).
-func Fatalln(v ...interface{}) {
-	std.Output(2, fmt.Sprintln(v...))
-	os.Exit(1)
-}
-
-// Panic is equivalent to Print() followed by a call to panic().
-func Panic(v ...interface{}) {
-	s := fmt.Sprint(v...)
-	std.Output(2, s)
-	panic(s)
-}
-
-// Panicf is equivalent to Printf() followed by a call to panic().
-func Panicf(format string, v ...interface{}) {
-	s := fmt.Sprintf(format, v...)
-	std.Output(2, s)
-	panic(s)
-}
-
-// Panicln is equivalent to Println() followed by a call to panic().
-func Panicln(v ...interface{}) {
-	s := fmt.Sprintln(v...)
-	std.Output(2, s)
-	panic(s)
-}
-
-// Output writes the output for a logging event.  The string s contains
-// the text to print after the prefix specified by the flags of the
-// Logger.  A newline is appended if the last character of s is not
-// already a newline.  Calldepth is the count of the number of
-// frames to skip when computing the file name and line number
-// if Llongfile or Lshortfile is set; a value of 1 will print the details
-// for the caller of Output.
-func Output(calldepth int, s string) error {
-	return std.Output(calldepth+1, s) // +1 for this frame.
 }
 
 /*****************************************************************/
@@ -546,7 +415,7 @@ func (l *Logger) Debug(v ...interface{}) {
 	if l.level <= DEBUG {
 		oldlevel := l.Getlevel()
 		l.Setlevel(DEBUG)
-		l.Output(2, fmt.Sprintln(v...))
+		l.output(2, fmt.Sprintln(v...))
 		l.Setlevel(oldlevel)
 	}
 }
@@ -556,7 +425,7 @@ func (l *Logger) Info(v ...interface{}) {
 	if l.level <= INFO {
 		oldlevel := l.Getlevel()
 		l.Setlevel(INFO)
-		l.Output(2, fmt.Sprintln(v...))
+		l.output(2, fmt.Sprintln(v...))
 		l.Setlevel(oldlevel)
 	}
 }
@@ -566,7 +435,7 @@ func (l *Logger) Warn(v ...interface{}) {
 	if l.level <= WARN {
 		oldlevel := l.Getlevel()
 		l.Setlevel(WARN)
-		l.Output(2, fmt.Sprintln(v...))
+		l.output(2, fmt.Sprintln(v...))
 		l.Setlevel(oldlevel)
 	}
 }
@@ -576,7 +445,7 @@ func (l *Logger) Error(v ...interface{}) {
 	if l.level <= ERROR {
 		oldlevel := l.Getlevel()
 		l.Setlevel(ERROR)
-		l.Output(2, fmt.Sprintln(v...))
+		l.output(2, fmt.Sprintln(v...))
 		l.Setlevel(oldlevel)
 	}
 }
@@ -616,7 +485,7 @@ func Debug(v ...interface{}) {
 	if std.level <= DEBUG {
 		oldlevel := std.Getlevel()
 		std.Setlevel(DEBUG)
-		std.Output(2, fmt.Sprintln(v...))
+		std.output(2, fmt.Sprintln(v...))
 		std.Setlevel(oldlevel)
 	}
 }
@@ -626,7 +495,7 @@ func Info(v ...interface{}) {
 	if std.level <= INFO {
 		oldlevel := std.Getlevel()
 		std.Setlevel(INFO)
-		std.Output(2, fmt.Sprintln(v...))
+		std.output(2, fmt.Sprintln(v...))
 		std.Setlevel(oldlevel)
 	}
 }
@@ -636,7 +505,7 @@ func Warn(v ...interface{}) {
 	if std.level <= WARN {
 		oldlevel := std.Getlevel()
 		std.Setlevel(WARN)
-		std.Output(2, fmt.Sprintln(v...))
+		std.output(2, fmt.Sprintln(v...))
 		std.Setlevel(oldlevel)
 	}
 }
@@ -646,7 +515,7 @@ func Error(v ...interface{}) {
 	if std.level <= ERROR {
 		oldlevel := std.Getlevel()
 		std.Setlevel(ERROR)
-		std.Output(2, fmt.Sprintln(v...))
+		std.output(2, fmt.Sprintln(v...))
 		std.Setlevel(oldlevel)
 	}
 }

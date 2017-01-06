@@ -1,6 +1,6 @@
 # golog
 
-### golog is a Go package extended the official [log](https://golang.org/pkg/log/) for witting logs into files.
+### golog is a Go package based on the official [log](https://golang.org/pkg/log/) for witting logs into files.
 
 #### Features
 
